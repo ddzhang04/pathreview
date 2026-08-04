@@ -110,3 +110,53 @@ change. I committed with `--no-verify` to keep the diff reviewable and will docu
 in the PR rather than reformat the file, which matches the Week 9 guidance that a
 contribution should not make things worse rather than fix the whole codebase. Ruff, black,
 and mypy all pass on the code I actually wrote.
+
+---
+
+### Check-in 2 (end of week)
+
+**PR link:** https://github.com/ascherj/pathreview/pull/725
+
+**Branch:** `feat/52-contribution-streak`
+
+**What you built:**
+`GitHubTool` now returns a `contribution_streak` field: the longest run of consecutive days
+the user contributed on. Because the daily contribution calendar is not exposed over REST,
+it queries the GraphQL `contributionsCollection` calendar, walking backward in one-year
+windows (GraphQL caps `to` at one year past `from`) and merging every window into a single
+date-keyed map before scanning it. Merging first is what makes a streak spanning a year
+boundary count as one run instead of two, and it also dedupes the overlapping days the
+week-aligned calendar returns at window edges.
+
+**Tests added or updated:**
+`tests/unit/test_github_tool.py`, a new file with 18 tests. Eight cover the tool end to end
+with mocked HTTP: the no-token path (asserting no GraphQL request is even attempted),
+unknown users (GraphQL returns `data.user: null` with HTTP 200, so `raise_for_status()`
+does not catch it), GraphQL `errors` arrays, HTTP failures, and a malformed response not
+taking down the other ten fields. The remaining ten cover `_longest_streak()` directly:
+year boundary, leap day, zero days and missing dates breaking a run, trailing zero days not
+truncating the recorded best, and the empty case.
+
+**Self-review confirmation:** [x] `make check` passes [x] `make test-unit` passes
+
+Read against documented pre-existing failures, as the Week 9 instructions define it: my
+changes introduce no new failures. Baselines measured on a clean Week 7 checkout and
+re-measured after the change:
+
+| Command | Baseline | With my changes |
+| --- | --- | --- |
+| `pytest tests/unit -m unit` | 53 failed, 375 passed | 53 failed, 393 passed |
+| `ruff check .` | 182 errors | 182 errors |
+| `make typecheck` | 5 errors in 4 files | 5 errors in 4 files |
+
+Failures flat, passing up by exactly my 18 tests, lint identical. Both files I touched are
+mypy-clean. All of this is documented in the PR body.
+
+**Draft PR feedback received from:** none. I did not get peer review before submitting, so
+the two open design questions (total contributions vs commits only, and degrading to `None`
+without a token vs requiring one) go to the maintainer cold in the PR description rather
+than having been pressure-tested by a classmate first.
+
+**Late submission:** the PR was opened Monday August 3 at approximately 3:15PM EDT, after
+the 2:59AM EDT deadline. The implementation and Check-in 1 were committed and pushed on
+Wednesday July 29, before the midweek deadline; what slipped was opening the PR itself.
