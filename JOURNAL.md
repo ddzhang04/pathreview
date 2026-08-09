@@ -160,3 +160,117 @@ than having been pressure-tested by a classmate first.
 **Late submission:** the PR was opened Monday August 3 at approximately 3:15PM EDT, after
 the 2:59AM EDT deadline. The implementation and Check-in 1 were committed and pushed on
 Wednesday July 29, before the midweek deadline; what slipped was opening the PR itself.
+
+## Week 10 — Iteration & reflection
+
+### Reviewer feedback
+
+**Feedback received:** [ ] Yes [x] No — still awaiting review
+
+**Summary of feedback:**
+No review came in. As of Sunday August 9, PR
+[#725](https://github.com/ascherj/pathreview/pull/725) is still open with zero comments and
+zero reviews. Two factors beyond the Su26 note that reviewer feedback is not a feature this
+term: I submitted the PR late, and I never got the draft PR peer review the Week 9
+instructions asked for, so nobody had eyes on it at any stage.
+
+**How you responded:**
+No feedback to respond to. The two questions I raised for the maintainer in the PR
+description, whether the streak should count commits only rather than all contributions,
+and whether degrading to `None` without a token is the right call, remain open.
+
+---
+
+### Reflection
+
+**What was harder than you expected?**
+
+The code was the easy part. `_longest_streak()` is fifteen lines and took maybe twenty
+minutes including the edge cases. Everything around it took the rest of the four weeks.
+
+The specific thing that caught me was assuming I could add a GraphQL call next to the
+existing REST calls and be done. I tested it instead of assuming, and got a 403 with no
+token, where the REST endpoints the tool already used returned 200 unauthenticated. That
+one measurement invalidated my original design. The feature fundamentally could not
+preserve the tool's token-free behavior, so I had to decide what the field should do when
+it cannot be measured. That is where `None` versus `0` came from: `None` means "not
+measured," `0` means "measured, no contributing days," and collapsing them would report an
+unmeasured user as an inactive one.
+
+The other surprise was the state of the repo. On a clean checkout, before I touched
+anything, `pytest tests/unit` gave 53 failures and `ruff check .` gave 182 errors. I had
+assumed a green baseline and had to stop and measure first so I could later prove I had not
+made anything worse.
+
+**What did you learn about working in a large codebase?**
+
+That most of the work happens before you write a line. I spent real time mapping what would
+break: checking whether any Pydantic schema pinned `GitHubTool`'s output shape (none did),
+whether the orchestrator would need changes to pass a new key through (it would not, it
+stores `result.data` wholesale), and who read the fields downstream.
+
+That mapping turned up something I would never have found in my own project. `grep -rn
+"Orchestrator("` returns no instantiation anywhere in the repo. The component that calls my
+tool is not wired into the running application. I ran the app locally to confirm it, and my
+field genuinely cannot appear anywhere in the UI. In my own projects, code I write is code
+that runs. Here I shipped something correct and tested that no user can currently reach,
+and the right response was to disclose that in the PR rather than quietly hope nobody
+noticed.
+
+I also learned that "don't make it worse" is a different and more useful bar than "make it
+perfect." I left 182 lint errors alone. I left `github_tool.py` unformatted, because staging
+it would have made black rewrite 49 lines that had nothing to do with my change and would
+have buried a 157-line feature in noise and guaranteed a conflict with upstream. Restraint
+about what not to touch turned out to matter as much as the change itself.
+
+**How did AI tools help — and where did they fall short?**
+
+I used AI heavily, which the course encourages, so I want to be accurate about the split.
+
+Where it helped most: orientation. This is a 100-plus file repo across seven packages, and I
+went from opening it to knowing exactly which file and which three functions mattered in
+well under an hour. It was also good at generating the test matrix once I knew what the
+edge cases were, and at drafting the PR description and this journal.
+
+Where it fell short: anything requiring a measurement rather than a recollection. The 403
+finding came from actually firing a request at `api.github.com/graphql`, not from asking. If
+I had trusted a plausible-sounding answer about the auth model I would have built the wrong
+thing. Same with the 53 failures and 182 lint errors, which nothing could tell me without
+running the commands in this specific repo at this specific commit. The pattern I would
+take forward: AI is strong at "where is this and what does it look like," weak at "what is
+actually true right now in this environment," and the second category is where the design
+decisions live.
+
+It also did nothing to save me from the process failure. No tool was going to open the PR
+for me on Wednesday.
+
+**What would you do differently if you started over?**
+
+Open the draft PR at the start of Week 9, not the end. This is the clear one. The
+instructions said to, I did not, and it cost me twice: the submission went in about twelve
+hours past the deadline, and I never got peer review, so my two open design questions went
+to the maintainer cold instead of being pressure-tested by a classmate first. The
+implementation was finished and pushed the prior Wednesday. What slipped was purely the
+submission step, which is the most avoidable kind of miss.
+
+Second, I would verify the API's authentication model during issue selection rather than
+during implementation. My Week 7 notes guessed that GraphQL would be needed. Spending ten
+minutes confirming that in Week 7 would have surfaced the token constraint before I wrote a
+plan around it.
+
+Third, I would weigh reachability when picking the issue. Given the choice again I would
+prefer an issue whose result I can demonstrate in the running application.
+
+**What are you most proud of from this module?**
+
+Writing the reproduction test in Week 8 and leaving it red for a week.
+
+It would have been faster to note "the field is missing" and move on. Instead I wrote a
+test that asserted `contribution_streak` existed, watched it fail with the actual list of
+ten keys the tool returned, and committed it failing. I also wrote two passing control
+tests next to it, so the failure could not be dismissed as a broken fixture. When the fix
+landed in Week 9, that test went green on its own without being edited to fit the
+implementation.
+
+That is the habit I want to keep. The test was written when I only understood the problem,
+not the solution, so it described the requirement rather than the code I happened to write.
